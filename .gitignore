@@ -1,0 +1,11 @@
+#环境变量文件
+.env
+*.env
+
+*python缓存
+__pycache__/
+*.pyc
+
+*IDE配置（可选）
+.vscode/
+.idea/
