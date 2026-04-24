@@ -1,51 +1,63 @@
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.runnables import RunnablePassthrough, RunnableLambda
-from langchain.memory import ConversationBufferMemory # 社区记忆模块
-import uuid
+from langchain_core.runnables import RunnableLambda, RunnablePassthrough
+from langchain.memory import ConversationBufferMemory
 
-llm = ChatOpenAI(temperature=0.7, model="gpt-3.5-turbo")
+# --- 初始化 LLM ---
+llm = ChatOpenAI(
+    temperature=0.7,
+    model=os.getenv("MODEL_NAME", "gpt-3.5-turbo")
+)
 
-# 1. 初始化 Memory
-memory = ConversationBufferMemory(return_messages=True, memory_key="history")
+# --- 初始化 Memory（与 Day9 完全一致） ---
+memory = ConversationBufferMemory(
+    return_messages=True,     # 返回 Message 对象列表，方便填入 MessagesPlaceholder
+    memory_key="history"      # 在 prompt 模板中占位符变量名
+)
 
-# 2. Prompt 模板（包含历史占位符）
+# --- Prompt 模板：使用 MessagesPlaceholder 容纳历史列表 ---
 prompt = ChatPromptTemplate.from_messages([
-    ("system", "你是一个友好的助手。"),
-    MessagesPlaceholder(variable_name="history"),
+    ("system", "你是一个友好的助手，请用简洁的方式回答问题。"),
+    MessagesPlaceholder(variable_name="history"),   # 这里会插入历史消息列表
     ("human", "{input}")
 ])
 
-# 3. 核心 LCEL 链：利用 RunnablePassthrough.assign 动态注入历史
+# --- 动态提取记忆的函数 ---
 def load_history(_):
-    """从 memory 加载历史消息列表"""
+    """从 memory 对象中加载当前对话历史，返回消息列表"""
     return memory.load_memory_variables({})["history"]
 
-# 构建链
+# --- 构建纯 LCEL 链 ---
 chain = (
-    RunnablePassthrough.assign(
-        history=RunnableLambda(load_history)  # 运行时加载历史
-    )
+    RunnablePassthrough.assign(history=load_history) 
+    | RunnableLambda(lambda x: (print("字典内容:", x.keys(), "历史消息数:", len(x["history"])), x)[1]) # 注入 history
     | prompt
     | llm
 )
 
-# 4. 对话循环（模拟交互）
-session_id = str(uuid.uuid4())[:8]
-print(f"会话 ID: {session_id}\n")
+# --- 交互式对话循环 ---
+if __name__ == "__main__":
+    print("💬 带记忆的对话机器人（LCEL 原生实现）")
+    print("输入 'exit' 或 'quit' 结束对话\n")
 
-while True:
-    user_input = input("You: ")
-    if user_input.lower() in ["exit", "quit"]:
-        break
-    
-    # 调用链获取回复
-    response = chain.invoke({"input": user_input})
-    ai_msg = response.content
-    
-    # 将本轮对话存入 memory
-    memory.save_context({"input": user_input}, {"output": ai_msg})
-    # 注意：如果 prompt 里 AI 的角色是 assistant，保存时需用 "output" 键
-    # memory.chat_memory.add_message(AIMessage(content=ai_msg))
-    
-    print(f"Bot: {ai_msg}\n")
+    while True:
+        user_input = input("You: ")
+        if user_input.lower() in ["exit", "quit"]:
+            print("对话结束。记忆已清空（未持久化）。")
+            break
+
+        # 调用链（此时链内自动读取了 memory 中的历史）
+        response = chain.invoke({"input": user_input})
+        ai_text = response.content
+
+        print(f"Bot: {ai_text}")
+
+        # 关键步骤：将本轮对话保存到 memory（副作用在链外完成）
+        memory.save_context(
+            {"input": user_input},
+            {"output": ai_text}
+        )
