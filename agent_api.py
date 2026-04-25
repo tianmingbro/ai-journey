@@ -130,5 +130,24 @@ async def chat_stream(request: ChatRequest):
         }
     )
 
+# if __name__ == "__main__":
+#     uvicorn.run(app, host="0.0.0.0", port=8000)
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    observer = ToolLoggingCallback()
+    test_queries = [
+        "计算 sin(pi/2) + sqrt(144)",             # 合法科学计算
+        "帮我算 100 除以 0",                       # 除零错误（测试友好提示）
+        "请计算 sqrt(-1)",                         # ValueError（测试错误反馈）
+        "北京天气怎么样？然后帮我计算 （（（3+5）*2）"         # 括号不匹配（测试非法表达式）
+    ]
+    
+    for query in test_queries:
+        print(f"\n{'='*60}")
+        print(f"用户: {query}")
+        result = agent.invoke(
+            {"messages": [{"role": "user", "content": query}]},
+            config={"callbacks": [observer]}
+        )
+        for msg in result["messages"]:
+            if hasattr(msg, "content") and msg.type == "ai" and msg.content:
+                print(f"Agent: {msg.content}")
