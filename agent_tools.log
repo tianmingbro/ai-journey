@@ -1,0 +1,4 @@
+2026-04-25 11:30:07,591 | INFO | [session=fdc02f91] 🔧 get_weather 被调用, 参数: {'city': '上海'}
+2026-04-25 11:30:07,602 | INFO | [session=fdc02f91] 📤 工具返回: content='上海天气：多云，26°C，湿度 65%，东南风 2 级' name='get_weather' tool_call_id='call_-7682424391950395050'
+2026-04-25 11:31:16,950 | INFO | [session=89b06080] 🔧 calculator 被调用, 参数: {'expression': '123*456'}
+2026-04-25 11:31:16,962 | INFO | [session=89b06080] 📤 工具返回: content='计算结果：56088' name='calculator' tool_call_id='call_-7682424804267260695'
