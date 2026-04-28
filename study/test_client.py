@@ -1,6 +1,6 @@
 # test_clients.py
 import asyncio
-from api_client import ZhipuClient, AsyncZhipuClient, QwenClient, AsyncQwenClient
+from study.api_client import ZhipuClient, AsyncZhipuClient, QwenClient, AsyncQwenClient
 
 def test_sync():
     print("=== 同步智谱调用 ===")

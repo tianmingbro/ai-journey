@@ -3,13 +3,13 @@ import uuid
 import uvicorn
 from dotenv import load_dotenv
 
-from callbacks import ToolLoggingCallback
+from study.callbacks import ToolLoggingCallback
 load_dotenv()
 
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
-from models import ChatRequest, ChatResponse
-from agent_factory import build_agent
+from study.models import ChatRequest, ChatResponse
+from study.agent_factory import build_agent
 
 app = FastAPI(title="Multi-Tool Agent API")
 

@@ -1,6 +1,6 @@
 import uvicorn
 from fastapi import FastAPI
-from models import ChatRequest, ChatResponse
+from study.models import ChatRequest, ChatResponse
 
 app = FastAPI(
     title="Echo 助手",

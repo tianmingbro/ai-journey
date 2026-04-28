@@ -1,7 +1,7 @@
 # chat_with_memory.py
 import os
 import tiktoken
-from api_client import QwenClient, ZhipuClient  # 复用之前封装的客户端
+from study.api_client import QwenClient, ZhipuClient  # 复用之前封装的客户端
 from dotenv import load_dotenv
 
 load_dotenv()
