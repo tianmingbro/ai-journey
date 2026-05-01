@@ -19,7 +19,7 @@ from typing import List, Dict
 
 # 引入之前封装好的处理函数
 # sys.path.append("./week4/day17")
-from document_processor import process_documents
+from study.document_processor import process_documents
 
 # --------- 1. 文档加载与预处理 ---------
 DOC_DIR = "./test_docs"

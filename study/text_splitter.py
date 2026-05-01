@@ -1,5 +1,5 @@
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from document_loader import documents  # 复用文档加载步骤的结果
+from study.document_loader import documents  # 复用文档加载步骤的结果
 
 # 定义分词器使用的分隔符（针对中英文混合优化）
 CUSTOM_SEPARATORS = [
