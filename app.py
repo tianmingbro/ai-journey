@@ -55,8 +55,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==================== 常量 ====================
-# API_BASE = "http://localhost:8000"
 import os
+# API_BASE = os.getenv("API_BASE", "http://localhost:8000")
 API_BASE = os.getenv("API_BASE", "http://localhost:8000")
 
 # ==================== 初始化会话状态 ====================
@@ -97,7 +97,7 @@ with st.sidebar:
             with st.spinner("正在处理文档..."):
                 try:
                     resp = requests.post(
-                        f"{API_BASE}/upload",
+                        f"{API_BASE}/api/upload",
                         files={"file": (uploaded_file.name,
                                         uploaded_file.getvalue(),
                                         "text/plain")},
@@ -141,7 +141,7 @@ if prompt := st.chat_input("请输入你的问题，按回车发送..."):
             def stream_response():
                 try:
                     resp = requests.post(
-                        f"{API_BASE}/chat/stream",
+                        f"{API_BASE}/api/chat/stream",
                         json={
                             "question": prompt,
                             "session_id": st.session_state.session_id
@@ -171,7 +171,7 @@ if prompt := st.chat_input("请输入你的问题，按回车发送..."):
             with st.spinner("🤔 思考中..."):
                 try:
                     resp = requests.post(
-                        f"{API_BASE}/chat",
+                        f"{API_BASE}/api/chat",
                         json={
                             "question": prompt,
                             "session_id": st.session_state.session_id
