@@ -55,7 +55,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==================== 常量 ====================
-API_BASE = "http://localhost:8000"
+# API_BASE = "http://localhost:8000"
+import os
+API_BASE = os.getenv("API_BASE", "http://localhost:8000")
 
 # ==================== 初始化会话状态 ====================
 if "session_id" not in st.session_state:

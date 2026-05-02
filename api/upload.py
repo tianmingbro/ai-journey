@@ -58,9 +58,13 @@ async def upload_document(file: UploadFile=File(...)):
         # if not chunks:
         #     raise HTTPException(status_code=400, detail="无法从文件中提取有效文本块。")
          # ---------- 4. 加载文档并分块 ----------
-        docs = DocumentService.load_file_and_split(tmp_path)  
+        docs = DocumentService.load_file_and_split(tmp_path) 
+        if not docs:
+            raise HTTPException(status_code=400, detail="文件内容为空或无法提取有效文本。")
         #5.写入向量数据库
-        VectorStoreService.create_from_documents(docs)
+        # VectorStoreService.create_from_documents(docs)
+        VectorStoreService.add_documents(docs)
+
         return UploadResponse(
             filename=safe_name,
             chunks=len(docs),

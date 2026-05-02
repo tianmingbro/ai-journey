@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# 环境变量（不要打包进镜像！）
+.env
+
+# 向量数据库（运行时由 volume 挂载）
+chroma_db/
+
+# 测试文档（可选）
+test_docs/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# 虚拟环境
+venv/
+.venv/
+
+# Docker 自身文件
+.dockerignore
+Dockerfile*
+docker-compose.yml

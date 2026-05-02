@@ -1,0 +1,33 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# 安装系统依赖 (curl 用于健康检查, gosu 用于权限切换)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    gosu \
+    && rm -rf /var/lib/apt/lists/*
+
+# 先复制依赖文件以利用缓存
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 复制全部源码（包括 entrypoint.sh）
+COPY . .
+
+# 创建 appuser，此时不切换用户
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+
+# 确保 entrypoint.sh 可执行
+RUN chmod +x /app/entrypoint.sh
+
+# 不再使用 USER appuser，由 entrypoint 控制降权
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD curl --fail http://localhost:8000/health || exit 1
+
+EXPOSE 8000
+
+# 入口点脚本，负责修正权限并启动应用
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["uvicorn", "api.app:app", "--host", "0.0.0.0", "--port", "8000"]

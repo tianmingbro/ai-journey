@@ -33,8 +33,8 @@ async def chat_stream(request:ChatRequest):
             async for token in rag.astream(request.session_id,request.question):
                 #sse格式：data：内容\n\n
                 yield f"data:{token}\n\n"
-                #允许事件循环切换，防止阻塞
-                await asyncio.sleep(0)
+                # #允许事件循环切换，防止阻塞
+                # await asyncio.sleep(0)
         except Exception as e:
             #流内异常也通过sse返回
             yield f"event:error\ndata:{str(e)}\n\n"

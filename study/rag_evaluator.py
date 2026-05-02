@@ -15,7 +15,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 from operator import itemgetter
 
-from chunking_strategies import STRATEGIES
+from study.chunking_strategies import STRATEGIES
 import re
 
 def extract_doc_id_from_source(source: str) -> str:
@@ -27,7 +27,7 @@ def extract_doc_id_from_source(source: str) -> str:
 DOC_DIR = "./test_docs"
 # 确保可以导入 Day17 的文档处理器
 # sys.path.append("../day17")
-from document_processor import process_documents
+from study.document_processor import process_documents
 
 raw_docs = process_documents(DOC_DIR, chunk_size=9999)  # 不做分块，返回原始文档列表
 # 根据文件名自动设置 doc_id

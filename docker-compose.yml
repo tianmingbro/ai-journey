@@ -1,0 +1,39 @@
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: rag-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/app/chroma_db        # 持久化向量数据库
+    env_file:
+      - .env                              # 注入 API Key 等敏感信息
+    networks:
+      - rag-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: rag-frontend
+    ports:
+      - "8501:8501"
+    environment:
+      - API_BASE=http://backend:8000      # 容器内用服务名通信
+    depends_on:
+      backend:
+        condition: service_healthy        # 等后端健康检查通过后再启动
+    networks:
+      - rag-network
+    restart: unless-stopped
+
+volumes:
+  chroma_data:
+
+networks:
+  rag-network:
+    driver: bridge

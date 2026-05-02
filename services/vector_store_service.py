@@ -1,5 +1,6 @@
 import os
-from typing import List
+import time
+from typing import List, Optional
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from config.settings import settings
@@ -23,20 +24,44 @@ class VectorStoreService:
         batch_size = 10
         for i in range(0, len(docs), batch_size):
             batch = docs[i:i + batch_size]
-            vectorstore.add_documents(batch)        
+            vectorstore.add_documents(batch)    
+            if i + batch_size < len(docs):
+                time.sleep(0.5)    
         return vectorstore
     
-    def load_existing()->Chroma:
+    @staticmethod
+    def add_documents(docs: List[Document]):
+        """
+        向现有知识库追加文档。如果知识库不存在，则创建。
+        """
+        vs = VectorStoreService.load_existing()
+        if vs is None:
+            # 知识库还不存在，就创建一个新的（保留 create_from_documents 用于初始建库）
+            VectorStoreService.create_from_documents(docs)
+        else:
+            vs.add_documents(docs)
+    @staticmethod
+    def load_existing() -> Optional[Chroma]:        
+    # def load_existing()->Chroma:
         """加载已持久化的向量存储"""
         persist_dir = settings.chroma_persist_dir
+        # if not os.path.exists(persist_dir) or not os.listdir(persist_dir):
+        #     raise FileNotFoundError(
+        #         f"向量库目录 '{persist_dir}' 不存在或为空。请先运行 DocumentService 和 "
+        #         "VectorStoreService.create_from_documents() 初始化知识库。"
+        #     )
+        # return Chroma(
+        #     embedding_function=get_embeddings(),
+        #     persist_directory=persist_dir,
+        #     collection_name=settings.collection_name
+        # )
         if not os.path.exists(persist_dir) or not os.listdir(persist_dir):
-            raise FileNotFoundError(
-                f"向量库目录 '{persist_dir}' 不存在或为空。请先运行 DocumentService 和 "
-                "VectorStoreService.create_from_documents() 初始化知识库。"
+            return None
+        try:
+            return Chroma(
+                embedding_function=get_embeddings(),
+                persist_directory=persist_dir,
+                collection_name=settings.collection_name
             )
-        return Chroma(
-            embedding_function=get_embeddings(),
-            persist_directory=persist_dir,
-            collection_name=settings.collection_name
-        )
-        
+        except Exception:
+            return None
