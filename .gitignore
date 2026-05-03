@@ -2,9 +2,19 @@
 .env
 *.env
 
+# 向量数据库文件（运行时产生，体积大）
+chroma_db/
+
+# 评测日志
+.log/
+*.log
+
 # Python 编译缓存
 __pycache__/
 *.pyc
+*.py[cod]
+*.egg-info/
+dist/
 
 # 虚拟环境 (如果用的是 venv 或 conda env 目录在项目内)
 venv/
