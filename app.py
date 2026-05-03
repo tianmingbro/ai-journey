@@ -2,6 +2,8 @@
 RAG 知识库问答 - Streamlit 前端（全功能集成版）
 启动前请确保 FastAPI 后端已在 8000 端口运行
 """
+import json
+
 import streamlit as st
 import requests
 import uuid
@@ -71,6 +73,7 @@ with st.sidebar:
 
     # 流式输出开关
     use_streaming = st.toggle("流式输出", value=True, help="开启后回答将逐字显示")
+    eval_mode = st.toggle("评测模式", value=False)
 
     # 会话信息
     st.caption(f"🆔 会话 ID: `{st.session_state.session_id}`")
@@ -134,40 +137,50 @@ if prompt := st.chat_input("请输入你的问题，按回车发送..."):
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # 助手回复
-    with st.chat_message("assistant"):
-        if use_streaming:
-            # ---------- 流式响应 ----------
-            def stream_response():
-                try:
-                    resp = requests.post(
-                        f"{API_BASE}/api/chat/stream",
-                        json={
-                            "question": prompt,
-                            "session_id": st.session_state.session_id
-                        },
-                        stream=True,
-                        timeout=60
-                    )
-                    if resp.status_code != 200:
-                        yield f"⚠️ 请求失败 ({resp.status_code})"
-                        return
+    full_answer = ""
+    eval_info = None  # 用于存储评测埋点数据
 
+    if use_streaming:
+         # ---------- 流式响应（手动解析 SSE） ----------
+        with st.chat_message("assistant"):
+            placeholder = st.empty()
+            try:
+                resp = requests.post(
+                    f"{API_BASE}/api/chat/stream",
+                    json={
+                        "question": prompt,
+                        "session_id": st.session_state.session_id
+                    },
+                    stream=True,
+                    timeout=60
+                )
+                if resp.status_code == 200:
                     for line in resp.iter_lines(decode_unicode=True):
-                        if line and line.startswith("data:"):
-                            data = line[5:].strip()
-                            if data == "[DONE]":
-                                break
-                            yield data
-                except requests.exceptions.RequestException as e:
-                    yield f"❌ 连接错误: {e}"
-
-            full_answer = st.write_stream(stream_response)
-            if full_answer is None:
-                full_answer = ""
-
-        else:
-            # ---------- 一次性响应 ----------
+                        if not line or not line.startswith("data:"):
+                            continue
+                        data = line[5:].strip()       # 去掉 "data:" 前缀
+                        if data == "[DONE]":
+                            break
+                        # 检测是否为评测埋点事件
+                        if data.startswith("{") and "eval_trace" in data:
+                            try:
+                                eval_info = json.loads(data).get("eval_trace")
+                            except Exception:
+                                pass
+                            continue                  # 不显示到界面
+                        # 普通 token，追加显示
+                        full_answer += data
+                        placeholder.markdown(full_answer + "▌")
+                    placeholder.markdown(full_answer)
+                else:
+                    full_answer = f"⚠️ 请求失败 ({resp.status_code})"
+                    placeholder.markdown(full_answer)
+            except requests.exceptions.RequestException as e:
+                full_answer = f"❌ 连接错误: {e}"
+                placeholder.markdown(full_answer)
+    else:
+        # ---------- 非流式响应 ----------
+        with st.chat_message("assistant"):
             with st.spinner("🤔 思考中..."):
                 try:
                     resp = requests.post(
@@ -179,14 +192,92 @@ if prompt := st.chat_input("请输入你的问题，按回车发送..."):
                         timeout=60
                     )
                     if resp.status_code == 200:
-                        full_answer = resp.json()["answer"]
+                        data = resp.json()
+                        full_answer = data["answer"]
+                        # 提取评测字段
+                        if data.get("latency_ms"):
+                            eval_info = {
+                                "latency_ms": data["latency_ms"],
+                                "token_usage": data.get("token_usage", {"total_tokens": 0}),
+                                "retrieved_docs": data.get("retrieved_docs", [])
+                            }
                     else:
                         full_answer = f"⚠️ 请求失败 ({resp.status_code})"
                 except requests.exceptions.RequestException as e:
                     full_answer = f"❌ 无法连接到后端服务: {e}"
             st.markdown(full_answer)
 
-        # 保存助手回复
-        st.session_state.messages.append(
-            {"role": "assistant", "content": full_answer}
-        )
+    # 保存助手回复（不包含 eval 面板的额外文字）
+    st.session_state.messages.append({"role": "assistant", "content": full_answer})
+
+    # 根据评测模式开关显示埋点面板
+    if eval_mode and eval_info:
+        with st.expander("📊 评测埋点数据", expanded=True):
+            st.metric("延迟 (ms)", f"{eval_info['latency_ms']:.2f}")
+            token_usage = eval_info.get("token_usage", {})
+            st.metric("Token 消耗", token_usage.get("total_tokens", 0))
+            docs = eval_info.get("retrieved_docs", [])
+            if docs:
+                st.caption("检索到的文档")
+                for doc in docs:
+                    st.text(f"📄 {doc['source']}: {doc['content'][:80]}...")
+
+
+        """# 助手回复
+        with st.chat_message("assistant"):
+            if use_streaming:
+                # ---------- 流式响应 ----------
+                def stream_response():
+                    try:
+                        resp = requests.post(
+                            f"{API_BASE}/api/chat/stream",
+                            json={
+                                "question": prompt,
+                                "session_id": st.session_state.session_id
+                            },
+                            stream=True,
+                            timeout=60
+                        )
+                        if resp.status_code != 200:
+                            yield f"⚠️ 请求失败 ({resp.status_code})"
+                            return
+
+                        for line in resp.iter_lines(decode_unicode=True):
+                            if line and line.startswith("data:"):
+                                data = line[5:].strip()
+                                if data == "[DONE]":
+                                    break
+                                yield data
+                    except requests.exceptions.RequestException as e:
+                        yield f"❌ 连接错误: {e}"
+
+                full_answer = st.write_stream(stream_response)
+                if full_answer is None:
+                    full_answer = ""
+
+            else:
+                # ---------- 一次性响应 ----------
+                with st.spinner("🤔 思考中..."):
+                    try:
+                        resp = requests.post(
+                            f"{API_BASE}/api/chat",
+                            json={
+                                "question": prompt,
+                                "session_id": st.session_state.session_id
+                            },
+                            timeout=60
+                        )
+                        if resp.status_code == 200:
+                            full_answer = resp.json()["answer"]
+                        else:
+                            full_answer = f"⚠️ 请求失败 ({resp.status_code})"
+                    except requests.exceptions.RequestException as e:
+                        full_answer = f"❌ 无法连接到后端服务: {e}"
+                st.markdown(full_answer)
+
+            # 保存助手回复
+            st.session_state.messages.append(
+                {"role": "assistant", "content": full_answer}
+            )"""
+
+    

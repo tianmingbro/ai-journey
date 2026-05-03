@@ -9,6 +9,7 @@ services:
       - "8000:8000"
     volumes:
       - ./chroma_db:/app/chroma_db   # 改用 bind mount
+      - ./.log:/app/.log           # 新增：持久化日志文件
       # - chroma_data:/app/chroma_db        # 持久化向量数据库
     env_file:
       - .env                              # 注入 API Key 等敏感信息

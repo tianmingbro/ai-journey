@@ -1,6 +1,6 @@
 import re
 from pydantic import BaseModel,Field,field_validator
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 #chat请求
 class ChatRequest(BaseModel):
@@ -34,10 +34,15 @@ class ChatRequest(BaseModel):
             ]
         }
     }
+    
 #chat响应
 class ChatResponse(BaseModel):
     answer:str=Field(...,description="模型生成的回答")
     session_id:str=Field(...,description="当前会话id")
+    # 评测埋点（可选）
+    latency_ms: Optional[float] = Field(None, description="端到端耗时(毫秒)")
+    token_usage: Optional[Dict[str, int]] = Field(None, description="Token 用量")
+    retrieved_docs: Optional[List[Dict[str, str]]] = Field(None, description="检索到的文档")
 
 #上传响应
 class UploadResponse(BaseModel):

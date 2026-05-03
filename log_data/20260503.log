@@ -1,0 +1,1 @@
+{"event": "eval_trace", "question": "大模型有哪些？", "answer": "", "retrieved_doc_count": 3, "retrieved_sources": ["weather_report", "test_docs/doc_001_llm_intro.txt", "test_docs/doc_001_llm_intro.txt"], "latency_ms": 225.67, "token_usage": {"total_tokens": 0}, "hit_rate": null, "mrr": null}

@@ -2,12 +2,19 @@ from operator import itemgetter
 import os
 
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.runnables import RunnablePassthrough, RunnableLambda
+from langchain_core.runnables import RunnablePassthrough, RunnableLambda,RunnableConfig
 from langchain_core.output_parsers import StrOutputParser
 from langchain_community.chat_message_histories import ChatMessageHistory
 from config.settings import settings
 from utils.llm import get_llm
 from services.vector_store_service import VectorStoreService
+from callbacks.eval_tracker import EvaluationTracker
+
+def _safe_latency(timer):
+    """安全获取计时器耗时"""
+    if timer is not None and hasattr(timer, 'elapsed_ms'):
+        return timer.elapsed_ms
+    return 0.0
 
 class RAGService:
     """带记忆的 RAG 问答服务，管理检索、记忆和 LLM 调用"""
@@ -92,43 +99,85 @@ class RAGService:
 
     def chat(self, session_id: str, question: str) -> str:
         """执行一次问答，并自动保存本轮对话到历史"""
+       
         self._ensure_initialized()
         if self.chain is None:
             return "⚠️ 知识库尚未初始化。请先通过网页上传文档，或联系管理员配置初始文档。"
+        # 创建追踪器
+        tracker = EvaluationTracker(session_id)
+        config: RunnableConfig = {"callbacks": [tracker]}
 
         history = self._store.get(session_id, ChatMessageHistory())
         answer = self.chain.invoke({
             "session_id": session_id,
             "question": question
-        })
+            },
+            config
+        )
+        
         history.add_user_message(question)
         history.add_ai_message(answer)
         self._store[session_id] = history
-        return answer
 
+        # 记录埋点并返回数据
+        tracker.flush_trace(question, answer, tracker._retrieved_docs)
+        llm_timer = tracker._timers.get("llm") if "llm" in tracker._timers else None
+        latency_ms = llm_timer.elapsed_ms if llm_timer and hasattr(llm_timer, 'elapsed_ms') else 0.0
+        eval_data = {
+            "latency_ms": latency_ms,
+            "token_usage": {"total_tokens": tracker._total_tokens},
+            "retrieved_docs": [
+                {
+                    "source": d.metadata.get("source", ""),
+                    "content": d.page_content[:100]  # 截断展示
+                }
+                for d in tracker._retrieved_docs
+            ]
+        }
+        return answer, eval_data
+    
     async def astream(self, session_id: str, question: str):
         """异步流式生成，逐个产出 token，并自动保存历史"""
+        
         self._ensure_initialized()
         if self.stream_chain is None:
             yield "⚠️ 知识库尚未初始化。请先通过网页上传文档，或联系管理员配置初始文档。"
             return
-
+        tracker = EvaluationTracker(session_id)
+        config: RunnableConfig = {"callbacks": [tracker]}
+        
         history = self._store.get(session_id, ChatMessageHistory())
         inputs = {"session_id": session_id, "question": question}
-        full_answer = []
+        # full_answer = []
+        full_answer =""
 
         try:
-            async for chunk in self.stream_chain.astream(inputs):
-                full_answer.append(chunk)
+            async for chunk in self.stream_chain.astream(inputs,config):
+                full_answer+=chunk
                 yield chunk
         except Exception as e:
             yield f"【出错】{e}"
         finally:
-            final_text = "".join(full_answer).strip()
+            # final_text = "".join(full_answer).strip()
+            final_text = full_answer.strip()
             if final_text:
                 history.add_user_message(question)
                 history.add_ai_message(final_text)
                 self._store[session_id] = history
+        
+        # 记录埋点并 yield eval 事件
+        tracker.flush_trace(question, full_answer, tracker._retrieved_docs)
+        llm_timer = tracker._timers.get("llm") if "llm" in tracker._timers else None
+        latency_ms = llm_timer.elapsed_ms if llm_timer and hasattr(llm_timer, 'elapsed_ms') else 0.0
+        eval_data = {
+            "latency_ms": latency_ms,
+            "token_usage": {"total_tokens": tracker._total_tokens},
+            "retrieved_docs": [
+                {"source": d.metadata.get("source", ""), "content": d.page_content[:100]}
+                for d in tracker._retrieved_docs
+            ]
+        }
+        yield {"eval_trace": eval_data}   # 特殊标记，前端识别
 
     def clear_history(self, session_id: str) -> None:
         """清除指定会话的聊天历史"""
